@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0e1116">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Maverick Drive — City Driving Simulator</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <div id="hud" class="hidden">
+    <div id="topbar">
+      <div id="objective">—</div>
+      <div id="stats"><span id="timer">0:00</span><span id="score">100</span></div>
+    </div>
+    <div id="toasts"></div>
+    <canvas id="minimap" width="200" height="200"></canvas>
+    <div id="signals"><span id="sigL">◀</span><span id="sigR">▶</span></div>
+    <div id="dash">
+      <div id="limit"><span>50</span></div><div id="lightAhead" title="Next traffic light"></div>
+      <div id="speedo"><b id="speed">0</b><small id="unit">km/h</small></div>
+      <div id="gearbox"><span data-g="P">P</span><span data-g="R">R</span><span data-g="N">N</span><span data-g="D">D</span><em id="gearNum"></em></div>
+      <div class="bar"><label>RPM</label><i id="rpmBar"></i></div>
+      <div class="bar"><label>FUEL</label><i id="fuelBar"></i></div>
+      <div class="bar"><label>DMG</label><i id="dmgBar"></i></div>
+      <div id="icons"><span id="icoLights" title="Headlights">💡</span><span id="icoHand" title="Handbrake">(P)</span></div>
+    </div>
+    <div id="parkMeter" class="hidden"><div id="parkText">Line up in the bay</div><div class="pm"><i id="parkFill"></i></div></div>
+    <button id="pauseBtn" data-action="pause" aria-label="Pause">❚❚</button>
+    <div id="touch" class="hidden">
+      <div id="wheelWrap"><div id="wheel"><div class="spoke"></div><div class="hubdot"></div></div></div>
+      <div id="leftBtns">
+        <button data-action="indL" id="bIndL">◀</button><button data-action="hazard">⚠</button><button data-action="indR" id="bIndR">▶</button>
+      </div>
+      <div id="rightBtns">
+        <div id="gearBtns"><button data-action="P">P</button><button data-action="R">R</button><button data-action="N">N</button><button data-action="D">D</button></div>
+        <div id="smallBtns"><button data-action="lights">💡</button><button data-action="camera">🎥</button><button id="horn">📯</button><button id="hand">HB</button></div>
+        <div id="pedals"><div id="brake" class="pedal">BRAKE</div><div id="gas" class="pedal">GAS</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="menu" class="screen">
+    <div class="panel wide">
+      <h1>MAVERICK <span>DRIVE</span></h1>
+      <p class="sub">Realistic city driving simulator</p>
+      <div id="missionGrid"></div>
+      <div class="row">
+        <button id="btnSettings" class="ghost">⚙ Settings</button>
+        <button id="btnHelp" class="ghost">⌨ Controls</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="brief" class="screen hidden">
+    <div class="panel">
+      <h2 id="briefTitle"></h2>
+      <p id="briefText"></p>
+      <p id="briefMeta" class="meta"></p>
+      <div class="row"><button id="btnBack" class="ghost">Back</button><button id="btnGo">Start</button></div>
+    </div>
+  </div>
+
+  <div id="pause" class="screen hidden">
+    <div class="panel">
+      <h2>Paused</h2>
+      <div class="col">
+        <button id="btnResume">Resume</button>
+        <button id="btnRestart" class="ghost">Restart mission</button>
+        <button id="btnPauseSettings" class="ghost">Settings</button>
+        <button id="btnQuit" class="ghost">Mission list</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="result" class="screen hidden">
+    <div class="panel">
+      <h2 id="resTitle"></h2>
+      <div id="resStars"></div>
+      <p id="resReason"></p>
+      <div id="resStats"></div>
+      <ul id="resLog"></ul>
+      <div class="row"><button id="btnResList" class="ghost">Missions</button><button id="btnRetry" class="ghost">Retry</button><button id="btnNext">Next</button></div>
+    </div>
+  </div>
+
+  <div id="settings" class="screen hidden">
+    <div class="panel">
+      <h2>Settings</h2>
+      <div class="opt"><span>Traffic drives on the</span><div class="seg" data-key="side"><button data-v="1">Right</button><button data-v="-1">Left</button></div></div>
+      <div class="opt"><span>Graphics</span><div class="seg" data-key="quality"><button data-v="high">High</button><button data-v="low">Low</button></div></div>
+      <div class="opt"><span>Speed units</span><div class="seg" data-key="units"><button data-v="kmh">km/h</button><button data-v="mph">mph</button></div></div>
+      <div class="opt"><span>Sound</span><div class="seg" data-key="sound"><button data-v="true">On</button><button data-v="false">Off</button></div></div>
+      <div class="opt"><span>Easy gears (keyboard)</span><div class="seg" data-key="easyGears"><button data-v="true">On</button><button data-v="false">Off</button></div></div>
+      <p class="meta">Traffic side and graphics apply when a mission starts.</p>
+      <div class="row"><button id="btnSettingsBack">Done</button></div>
+    </div>
+  </div>
+
+  <div id="help" class="screen hidden">
+    <div class="panel">
+      <h2>Controls</h2>
+      <table class="keys">
+        <tr><td>W / ↑</td><td>Accelerator (hold Shift for gentle)</td></tr>
+        <tr><td>S / ↓</td><td>Brake</td></tr>
+        <tr><td>A D / ← →</td><td>Steer</td></tr>
+        <tr><td>1 2 3 4</td><td>Gear selector P R N D</td></tr>
+        <tr><td>Space</td><td>Handbrake</td></tr>
+        <tr><td>Q / E</td><td>Left / right indicator</td></tr>
+        <tr><td>Z</td><td>Hazard lights</td></tr>
+        <tr><td>L</td><td>Headlights</td></tr>
+        <tr><td>H</td><td>Horn</td></tr>
+        <tr><td>C</td><td>Change camera</td></tr>
+        <tr><td>Esc / P</td><td>Pause</td></tr>
+      </table>
+      <p class="meta">With <b>Easy gears</b> on, holding brake at a standstill selects reverse (then ↓ drives backwards and ↑ brakes); accelerating from a standstill selects drive. Phones and tablets get a steering wheel, pedals and gear buttons. Gamepads work too (RT/LT pedals, left stick steers, A handbrake).</p>
+      <div class="row"><button id="btnHelpBack">Got it</button></div>
+    </div>
+  </div>
+
+  <div id="loading" class="screen hidden"><div class="panel"><h2>Building the city…</h2></div></div>
+</div>
+<script src="build/game.js"></script>
+</body>
+</html>
