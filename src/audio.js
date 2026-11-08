@@ -40,18 +40,71 @@ export class Audio {
     const hf = ctx.createBiquadFilter(); hf.type = 'lowpass'; hf.frequency.value = 1800;
     for (const f of [415, 520]) { const o = ctx.createOscillator(); o.type = 'square'; o.frequency.value = f; o.connect(hf); o.start(); }
     hf.connect(this.hGain).connect(this.master);
+    // turbo whistle
+    this.tOsc = ctx.createOscillator(); this.tOsc.type = 'sine';
+    this.tGain = ctx.createGain(); this.tGain.gain.value = 0;
+    this.tOsc.connect(this.tGain).connect(this.master); this.tOsc.start();
+    // nitro hiss
+    const nh = noise();
+    this.nFilter = ctx.createBiquadFilter(); this.nFilter.type = 'highpass'; this.nFilter.frequency.value = 2500;
+    this.nGain = ctx.createGain(); this.nGain.gain.value = 0;
+    nh.connect(this.nFilter).connect(this.nGain).connect(this.master);
+    // siren
+    this.sOsc = ctx.createOscillator(); this.sOsc.type = 'sawtooth';
+    const sf = ctx.createBiquadFilter(); sf.type = 'lowpass'; sf.frequency.value = 2200;
+    this.sGain = ctx.createGain(); this.sGain.gain.value = 0;
+    this.sOsc.connect(sf).connect(this.sGain).connect(this.master); this.sOsc.start();
+    // engine distortion for big engines
+    this.shaper = ctx.createWaveShaper();
+    const curve = new Float32Array(256);
+    for (let i = 0; i < 256; i++) { const x = i / 128 - 1; curve[i] = Math.tanh(x * 2.5); }
+    this.shaper.curve = curve;
+    this.eFilter.disconnect(); this.eFilter.connect(this.shaper).connect(this.eGain);
+    this.profile = { cyl: 4, turbo: false };
+  }
+  setProfile(p) { this.profile = p; }
+  /** extra race sounds: nos on/off, siren distance (m, or null) */
+  race(nosOn, sirenDist, t) {
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    this.nGain.gain.setTargetAtTime(nosOn ? 0.09 : 0, now, 0.05);
+    if (sirenDist !== null && sirenDist < 250) {
+      const f = 650 + 450 * (0.5 + 0.5 * Math.sin(t * 2 * Math.PI * 0.55));
+      this.sOsc.frequency.setTargetAtTime(f, now, 0.02);
+      this.sGain.gain.setTargetAtTime(0.06 * Math.max(0, 1 - sirenDist / 250), now, 0.1);
+    } else this.sGain.gain.setTargetAtTime(0, now, 0.2);
+  }
+  blowoff() {
+    if (!this.ctx || !this.enabled || !this.profile.turbo) return;
+    const s = this.ctx.createBufferSource(); s.buffer = this.noiseBuf;
+    const f = this.ctx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 3200; f.Q.value = 1.5;
+    const g = this.ctx.createGain(); const t = this.ctx.currentTime;
+    g.gain.setValueAtTime(0.18, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+    s.connect(f).connect(g).connect(this.master); s.start(t); s.stop(t + 0.4);
+  }
+  pop() {
+    if (!this.ctx || !this.enabled) return;
+    const s = this.ctx.createBufferSource(); s.buffer = this.noiseBuf;
+    const f = this.ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 900;
+    const g = this.ctx.createGain(); const t = this.ctx.currentTime;
+    g.gain.setValueAtTime(0.35, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.09);
+    s.connect(f).connect(g).connect(this.master); s.start(t); s.stop(t + 0.1);
   }
   setEnabled(on) { this.enabled = on; if (this.master) this.master.gain.value = on ? 0.7 : 0; }
   update(car, throttle, slip, horn, active) {
     if (!this.ctx) return;
     const t = this.ctx.currentTime;
     const rpm = car.rpm;
-    const f = (rpm / 60) * 2; // 4-cylinder firing frequency
+    const P = this.profile;
+    const f = (rpm / 60) * (P.cyl / 2); // firing frequency
     this.o1.frequency.setTargetAtTime(f, t, 0.03);
     this.o2.frequency.setTargetAtTime(f * 0.5, t, 0.03);
-    this.o3.frequency.setTargetAtTime(f * 0.25, t, 0.03);
-    this.eFilter.frequency.setTargetAtTime(250 + throttle * 1400 + rpm * 0.12, t, 0.05);
-    this.eGain.gain.setTargetAtTime(active ? 0.05 + throttle * 0.07 + rpm / 90000 : 0, t, 0.05);
+    this.o3.frequency.setTargetAtTime(f * (P.cyl >= 8 ? 0.25 : 0.5), t, 0.03);
+    const big = P.cyl >= 8 ? 1 : 0;
+    this.eFilter.frequency.setTargetAtTime(220 + throttle * (1300 + big * 400) + rpm * 0.1, t, 0.05);
+    this.eGain.gain.setTargetAtTime(active ? (0.045 + throttle * 0.06 + rpm / 110000) * (car.limiter ? 0.5 : 1) : 0, t, 0.05);
+    this.tOsc.frequency.setTargetAtTime(1500 + rpm * 0.9, t, 0.05);
+    this.tGain.gain.setTargetAtTime(active && P.turbo ? throttle * Math.min(1, rpm / car.redline) * 0.025 : 0, t, 0.08);
     const sp = Math.abs(car.vx);
     this.sqGain.gain.setTargetAtTime(active && sp > 3 ? Math.min(0.25, Math.max(0, slip - 0.1) * 0.9) : 0, t, 0.05);
     this.rnGain.gain.setTargetAtTime(active ? Math.min(0.18, sp * 0.008) : 0, t, 0.1);

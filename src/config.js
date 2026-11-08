@@ -1,8 +1,8 @@
 // Global constants, settings and small helpers shared by every module.
 
 export const CFG = {
-  N: 5,              // city blocks per side
-  S: 80,             // distance between road centre lines (m)
+  N: 7,              // city blocks per side
+  S: 90,             // distance between road centre lines (m)
   ROAD_HALF: 6.1,    // half width of a street (lane 3.5 + parking lane 2.6)
   LANE_W: 3.5,       // driving lane width
   LANE_OFF: 1.75,    // driving lane centre offset from road centre

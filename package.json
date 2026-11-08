@@ -9,6 +9,7 @@
     "dev": "esbuild src/main.js --bundle --format=iife --sourcemap --outfile=build/game.js --watch --servedir=."
   },
   "devDependencies": {
+    "@pmndrs/assets": "^1.7.0",
     "esbuild": "^0.28.2",
     "three": "^0.187.0"
   }

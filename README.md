@@ -1,7 +1,26 @@
 # Maverick Drive
 
-A realistic 3D city driving simulator that runs in any modern browser — desktop or phone.
+A 3D **street racing** and **city driving** game that runs in any modern browser — desktop or phone.
 Built with [three.js](https://threejs.org/); no downloads, no plugins.
+
+## Street Racing
+- 4 original performance cars (AWD tuner, RWD V8 muscle, RWD GT, AWD hypercar) with real power curves,
+  drivetrain layouts, downforce and 6-speed gearboxes (automatic or manual), unlocked by winning events
+- Nitro (refills from drifting, high speed and near misses), turbo whistle / blow-off, exhaust backfire flames
+- Event types: **Sprint**, **Circuit**, **Drift**, **Speed Trap**, **Pursuit** and **Free Roam**
+- AI rivals drive the same physics as you (racing line, braking points, traffic avoidance, rubber-banding)
+- Police: patrol cars that start a pursuit if you speed past them, heat levels, reinforcements,
+  "busted" if boxed in, "evaded" once you break line of sight long enough
+- Tyre smoke, skid marks, sparks, speed blur, camera shake, garage with paint colours
+
+## Graphics
+- Image-based lighting and reflections from CC0 HDR environments (Poly Haven, via `@pmndrs/assets`)
+- Physically based clear-coat car paint, procedurally modelled cars (lofted bodies, wheel arches, alloy rims, brake calipers, LED lamps)
+- Glass towers that reflect the sky, lit shopfronts and windows at night, normal-mapped asphalt and paving
+- Bloom, colour grading, vignette, film grain, atmospheric sky with clouds (day / sunset / night)
+- "Low" graphics setting turns off post-processing for slower phones
+
+## Driving School
 
 ## Play
 
@@ -32,7 +51,7 @@ then visit <http://localhost:8000>. (Enable **GitHub Pages** on this repo — br
 
 **Driving examiner** — penalties for: running red lights, speeding, driving on the wrong side, turning without signalling, driving on the pavement, collisions. Hitting a pedestrian ends the mission.
 
-**Missions**: First Lesson · Kerbside (parallel parking) · Bay Day (reverse bay parking) · Eco Run (fuel budget) · Rush Hour · Night Shift · Driving Exam · Free Drive — each scored with up to 3 stars.
+**Driving-school missions**: First Lesson · Kerbside (parallel parking) · Bay Day (reverse bay parking) · Eco Run (fuel budget) · Rush Hour · Night Shift · Driving Exam · Free Drive — each scored with up to 3 stars.
 
 **Navigation**: rotating minimap with GPS route, floating guide arrow, upcoming traffic light indicator.
 
@@ -48,6 +67,9 @@ then visit <http://localhost:8000>. (Enable **GitHub Pages** on this repo — br
 | Q / E | Left / right indicator · Z hazards |
 | L | Headlights · H horn · C camera |
 | Esc / P | Pause |
+| Shift / N | Nitro (racing) |
+| Q / E | Gear down / up (racing, manual gearbox) |
+| R | Reset car onto the road (racing) |
 
 Phones/tablets get an on-screen steering wheel, analogue pedals (press higher on the pedal for more) and gear buttons. Gamepads: RT/LT pedals, left stick steers, A handbrake.
 
@@ -69,3 +91,8 @@ npm run dev     # rebuild on change + serve on http://localhost:8000
 | `src/rules.js` | Traffic-rule checks and penalties |
 | `src/missions.js` | Mission definitions and parking checks |
 | `src/main.js` | Game loop, camera, HUD, menus |
+| `src/render.js` | Renderer, HDR environment, sky, post-processing |
+| `src/carfactory.js` | Procedural car models + instanced traffic |
+| `src/race.js` | Street-racing events, rivals, police |
+| `src/ai.js` | Racing-line paths and AI drivers |
+| `src/effects.js` | Smoke, sparks, skid marks, nitro flames |

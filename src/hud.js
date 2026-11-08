@@ -34,7 +34,7 @@ export class Minimap {
     this.map = m;
   }
 
-  draw(car, cars, route, target, zoom = 1.3) {
+  draw(car, cars, route, target, zoom = 1.3, extra = null) {
     const g = this.ctx, W = this.c.width, H = this.c.height;
     g.clearRect(0, 0, W, H);
     g.save();
@@ -53,6 +53,7 @@ export class Minimap {
       g.stroke();
     }
     for (const c of cars) { g.fillStyle = '#e8e8e8'; g.fillRect(c.x - 1.2, c.z - 1.2, 2.4, 2.4); }
+    if (extra) for (const e of extra) { g.fillStyle = e.c; g.beginPath(); g.arc(e.x, e.z, e.big ? 4.5 : 3.5, 0, Math.PI * 2); g.fill(); }
     if (target) {
       g.fillStyle = '#35e07a'; g.strokeStyle = '#0b3'; g.lineWidth = 1;
       g.beginPath(); g.arc(target[0], target[1], 4.5, 0, Math.PI * 2); g.fill(); g.stroke();

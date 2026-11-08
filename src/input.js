@@ -6,14 +6,17 @@ export class Input {
     this.keys = new Set();
     this.out = { throttle: 0, brake: 0, steer: 0, handbrake: false, horn: false };
     this.kThrottle = 0; this.kBrake = 0; this.kSteer = 0;
-    this.touch = { steer: 0, gas: 0, brake: 0, hand: false, horn: false, active: false };
+    this.touch = { steer: 0, gas: 0, brake: 0, hand: false, horn: false, nos: false, active: false };
+    this.raceMode = false;
     this.actions = []; // one-shot actions: 'P','R','N','D','indL','indR','hazard','lights','camera','pause'
     window.addEventListener('keydown', (e) => {
       if (e.repeat) return;
       const k = e.key.toLowerCase();
       this.keys.add(k);
       const map = { '1': 'P', '2': 'R', '3': 'N', '4': 'D', q: 'indL', e: 'indR', z: 'hazard', l: 'lights', c: 'camera', escape: 'pause', p: 'pause' };
-      if (map[k]) this.actions.push(map[k]);
+      const raceMap = { q: 'shiftDown', e: 'shiftUp', r: 'reset', m: 'manual', c: 'camera', l: 'lights', escape: 'pause', p: 'pause' };
+      const a = this.raceMode ? raceMap[k] : map[k];
+      if (a) this.actions.push(a);
       if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' '].includes(k)) e.preventDefault();
     });
     window.addEventListener('keyup', (e) => this.keys.delete(e.key.toLowerCase()));
@@ -76,7 +79,7 @@ export class Input {
       const up = () => { this.touch[key] = false; el.classList.remove('down'); };
       el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up); el.addEventListener('pointerleave', up);
     };
-    hold('#hand', 'hand'); hold('#horn', 'horn');
+    hold('#hand', 'hand'); hold('#horn', 'horn'); hold('#nosBtn', 'nos');
     root.querySelectorAll('[data-action]').forEach((el) => {
       el.addEventListener('pointerdown', (e) => { this.actions.push(el.dataset.action); e.preventDefault(); e.stopPropagation(); });
     });
@@ -86,8 +89,9 @@ export class Input {
     const o = this.out;
     // keyboard: throttle/brake ramp in so a short tap gives a gentle input
     const up = this.has('arrowup', 'w'), down = this.has('arrowdown', 's');
-    this.kThrottle = up ? Math.min(1, this.kThrottle + dt * (this.has('shift') ? 0.6 : 2.2)) : Math.max(0, this.kThrottle - dt * 6);
-    if (up && this.has('shift')) this.kThrottle = Math.min(this.kThrottle, 0.45);
+    const gentle = !this.raceMode && this.has('shift');
+    this.kThrottle = up ? Math.min(1, this.kThrottle + dt * (gentle ? 0.6 : this.raceMode ? 6 : 2.2)) : Math.max(0, this.kThrottle - dt * 6);
+    if (up && gentle) this.kThrottle = Math.min(this.kThrottle, 0.45);
     this.kBrake = down ? Math.min(1, this.kBrake + dt * 3) : Math.max(0, this.kBrake - dt * 8);
     const left = this.has('arrowleft', 'a'), right = this.has('arrowright', 'd');
     const target = (left ? 1 : 0) - (right ? 1 : 0);
@@ -110,6 +114,7 @@ export class Input {
     o.steer = clamp(this.kSteer + t.steer + gS, -1, 1);
     o.handbrake = this.has(' ') || t.hand || gH;
     o.horn = this.has('h') || t.horn;
+    o.nos = this.raceMode && (this.has('shift', 'n') || t.nos || (gp && gp.buttons[1] && gp.buttons[1].pressed));
     o.up = up || t.gas > 0 || gT > 0.1;
     o.down = down || t.brake > 0 || gB > 0.1;
     return o;

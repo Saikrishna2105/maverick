@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { CFG, roadCoord, DIRS, rightOf, mulberry32, settings, clamp } from './config.js';
-import { CarInstancer, CAR_COLORS } from './models.js';
+import { Fleet } from './carfactory.js';
+import { CAR_COLORS } from './models.js';
 
 const { N, S, ROAD_HALF: RH, SIDEWALK: SW, OFF, EDGE } = CFG;
 const SLAB = 0.15;
@@ -73,14 +74,20 @@ export function buildWorld(scene, T, opts = {}) {
   };
 
   // ---------- ground ----------
-  const grassMat = new THREE.MeshStandardMaterial({ map: T.wrapRepeat(T.grass.clone(), 200, 200), roughness: 1 });
+  const grassMat = new THREE.MeshStandardMaterial({ map: T.wrapRepeat(T.grass.clone(), 160, 160), roughness: 1 });
   grassMat.map.needsUpdate = true;
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(1600, 1600), grassMat);
   ground.rotation.x = -Math.PI / 2; ground.position.y = -0.03; ground.receiveShadow = true;
   scene.add(ground);
   const roadSize = EDGE * 2;
-  const asphMat = new THREE.MeshStandardMaterial({ map: T.wrapRepeat(T.asphalt.clone(), roadSize / 10, roadSize / 10), roughness: 0.92 });
-  asphMat.map.needsUpdate = true;
+  const night = opts.time === 'night';
+  const asphMat = new THREE.MeshStandardMaterial({
+    map: T.wrapRepeat(T.asphalt.clone(), roadSize / 14, roadSize / 14),
+    normalMap: T.wrapRepeat(T.asphaltN.clone(), roadSize / 3, roadSize / 3), normalScale: new THREE.Vector2(0.22, 0.22),
+    roughnessMap: T.wrapRepeat(T.asphaltRough.clone(), roadSize / 23, roadSize / 23), roughness: night ? 0.62 : 1.0,
+    envMapIntensity: night ? 1.2 : 0.55,
+  });
+  for (const t of [asphMat.map, asphMat.normalMap, asphMat.roughnessMap]) t.needsUpdate = true;
   const asph = new THREE.Mesh(new THREE.PlaneGeometry(roadSize, roadSize), asphMat);
   asph.rotation.x = -Math.PI / 2; asph.receiveShadow = true;
   scene.add(asph);
@@ -150,7 +157,10 @@ export function buildWorld(scene, T, opts = {}) {
       const bx0 = l[0] + ins, bx1 = l[1] - ins, bz0 = l[2] + ins, bz1 = l[3] - ins;
       const h = 9 + Math.pow(rand(), 1.6) * (20 + 45 * centrality);
       const f = (rand() * T.facades.length) | 0;
-      push('f' + f, worldUV(box(bx0, bx1, SLAB, SLAB + h, bz0, bz1), 12, 12.8, [0.02, 0.02]));
+      const shopH = 4.6;
+      push('shop', worldUV(box(bx0, bx1, SLAB, SLAB + shopH, bz0, bz1), 24, shopH, [0.01, 0.98]));
+      push('f' + f, worldUV(box(bx0 + 0.05, bx1 - 0.05, SLAB + shopH, SLAB + h, bz0 + 0.05, bz1 - 0.05), 12, 12.8, [0.02, 0.02]));
+      push('ledge', box(bx0 - 0.25, bx1 + 0.25, SLAB + shopH, SLAB + shopH + 0.35, bz0 - 0.25, bz1 + 0.25));
       push('roof', box(bx0 + 0.3, bx1 - 0.3, SLAB + h, SLAB + h + 0.5, bz0 + 0.3, bz1 - 0.3));
       addBox(bx0, bx1, bz0, bz1, 'building');
       if (h > 26 && rand() < 0.55) {
@@ -204,7 +214,7 @@ export function buildWorld(scene, T, opts = {}) {
     const p0 = roadPt(axis, rc, a0, l0), p1 = roadPt(axis, rc, a1, l1);
     push(key, flat(Math.min(p0[0], p1[0]), Math.max(p0[0], p1[0]), Math.min(p0[1], p1[1]), Math.max(p0[1], p1[1]), 0.02));
   }
-  const fill = low ? 0.25 : 0.42;
+  const fill = opts.parkFill !== undefined ? opts.parkFill : low ? 0.18 : 0.3;
   for (let axis = 0; axis < 2; axis++) for (let ri = 0; ri <= N; ri++) {
     const rc = roadCoord(ri);
     const pls = SIDE * (axis === 0 ? 1 : -1); // lateral side of traffic moving in +along
@@ -281,7 +291,7 @@ export function buildWorld(scene, T, opts = {}) {
       });
     }
   }
-  const lampGeo = new THREE.SphereGeometry(0.13, 10, 8);
+  const lampGeo = new THREE.SphereGeometry(0.13, 6, 4);
   const lampMesh = new THREE.InstancedMesh(lampGeo, new THREE.MeshBasicMaterial({ color: 0xffffff }), lampSpecs.length);
   const tm = new THREE.Matrix4(), col = new THREE.Color();
   lampSpecs.forEach((l, i) => { tm.makeTranslation(l.x, l.y, l.z); lampMesh.setMatrixAt(i, tm); lampMesh.setColorAt(i, col.set(0x222222)); });
@@ -303,22 +313,31 @@ export function buildWorld(scene, T, opts = {}) {
 
   // ---------- trees mesh ----------
   const trunkGeo = new THREE.CylinderGeometry(0.15, 0.22, 2.6, 6); trunkGeo.translate(0, 1.3, 0);
-  const crownGeo = new THREE.IcosahedronGeometry(1.8, 1); crownGeo.translate(0, 3.9, 0);
+  // crown: a cluster of lumpy blobs for a natural silhouette
+  const blobs = [];
+  const blobSpec = [[0, 4.0, 0, 1.6], [0.9, 3.6, 0.3, 1.2], [-0.8, 3.7, -0.4, 1.25], [0.2, 4.7, -0.5, 1.15]];
+  for (const [x, y, z, r] of blobSpec) {
+    const b = new THREE.IcosahedronGeometry(r, 1);
+    const p = b.attributes.position;
+    for (let i = 0; i < p.count; i++) { const k = 1 + (Math.sin(p.getX(i) * 7.1 + p.getY(i) * 5.3) * Math.cos(p.getZ(i) * 6.7)) * 0.12; p.setXYZ(i, p.getX(i) * k, p.getY(i) * k, p.getZ(i) * k); }
+    b.translate(x, y, z); blobs.push(b.toNonIndexed());
+  }
+  const crownGeo = mergeGeometries(blobs); crownGeo.computeVertexNormals();
   // outside the city
-  for (let k = 0; k < (low ? 60 : 160); k++) {
+  for (let k = 0; k < (low ? 30 : 70); k++) {
     const a = rand() * Math.PI * 2, r = O1 + 8 + rand() * 120;
     trees.push([Math.cos(a) * r, Math.sin(a) * r, 1 + rand()]);
   }
   const trunks = new THREE.InstancedMesh(trunkGeo, new THREE.MeshStandardMaterial({ color: 0x5b4330, roughness: 1 }), trees.length);
-  const crowns = new THREE.InstancedMesh(crownGeo, new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.95, flatShading: true }), trees.length);
-  crowns.castShadow = true; trunks.castShadow = true;
+  const crowns = new THREE.InstancedMesh(crownGeo, new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9, normalMap: T.concreteN, normalScale: new THREE.Vector2(1.5, 1.5) }), trees.length);
+  crowns.castShadow = true; trunks.castShadow = false;
   const q = new THREE.Quaternion(), sv = new THREE.Vector3(), pv = new THREE.Vector3();
   trees.forEach((t, i) => {
     const y = Math.abs(t[0]) < EDGE + SW && Math.abs(t[1]) < EDGE + SW ? SLAB : 0;
     q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), rand() * 6.28);
     tm.compose(pv.set(t[0], y, t[1]), q, sv.set(t[2], t[2] * (0.85 + rand() * 0.4), t[2]));
     trunks.setMatrixAt(i, tm); crowns.setMatrixAt(i, tm);
-    crowns.setColorAt(i, col.setHSL(0.24 + rand() * 0.08, 0.45 + rand() * 0.2, 0.22 + rand() * 0.1));
+    crowns.setColorAt(i, col.setHSL(0.22 + rand() * 0.08, 0.38 + rand() * 0.2, 0.16 + rand() * 0.08));
   });
   scene.add(trunks, crowns);
 
@@ -345,12 +364,16 @@ export function buildWorld(scene, T, opts = {}) {
   scene.add(lampPoles, lampHeads, glows);
 
   // ---------- merge static geometry ----------
-  const facadeMats = T.facades.map((f, i) => new THREE.MeshStandardMaterial({
-    map: f, emissiveMap: T.facadeLights[i], emissive: 0xffffff, emissiveIntensity: 0, roughness: 0.85,
+  const facadeMats = T.facades.map((f) => new THREE.MeshStandardMaterial({
+    map: f.map, roughnessMap: f.rough, metalnessMap: f.metal, metalness: 0.9, roughness: 1,
+    emissiveMap: f.em, emissive: 0xffffff, emissiveIntensity: 0, envMapIntensity: 1.3,
   }));
   const walkTex = T.sidewalk.clone(); walkTex.needsUpdate = true;
+  const shopMat = new THREE.MeshStandardMaterial({ map: T.shops, emissiveMap: T.shopsEm, emissive: 0xffffff, emissiveIntensity: 0, roughness: 0.5, metalness: 0.2 });
   const mats = {
-    walk: new THREE.MeshStandardMaterial({ map: walkTex, roughness: 0.95 }),
+    walk: new THREE.MeshStandardMaterial({ map: walkTex, normalMap: T.pavingN, normalScale: new THREE.Vector2(0.6, 0.6), roughness: 0.9 }),
+    shop: shopMat,
+    ledge: new THREE.MeshStandardMaterial({ color: 0x8c877e, roughness: 0.8, normalMap: T.concreteN }),
     grass: new THREE.MeshStandardMaterial({ map: T.grass, roughness: 1 }),
     wall: new THREE.MeshStandardMaterial({ color: 0x9c968c, roughness: 0.9 }),
     roof: new THREE.MeshStandardMaterial({ color: 0x55575a, roughness: 0.95 }),
@@ -362,11 +385,11 @@ export function buildWorld(scene, T, opts = {}) {
   facadeMats.forEach((m, i) => { mats['f' + i] = m; });
   for (const k of Object.keys(buckets)) {
     let list = buckets[k];
-    if (k === 'walk' || k === 'grass' || k === 'wall') list = list.map((g) => worldUV(g, 4, 4));
+    if (k === 'walk' || k === 'grass' || k === 'wall' || k === 'ledge') list = list.map((g) => worldUV(g, 4, 4));
     const merged = mergeGeometries(list.map((g) => (g.index ? g.toNonIndexed() : g)));
     const mesh = new THREE.Mesh(merged, mats[k]);
     mesh.receiveShadow = true;
-    mesh.castShadow = k[0] === 'f' || k === 'wall' || k === 'roof' || k === 'pole' || k === 'housing';
+    mesh.castShadow = k[0] === 'f' || k === 'shop' || k === 'wall' || k === 'roof' || k === 'pole' || k === 'housing';
     scene.add(mesh);
   }
   W.facadeMats = facadeMats;
@@ -389,16 +412,34 @@ export function buildWorld(scene, T, opts = {}) {
   W.cars = null; // CarInstancer, created in finalize
   W.finalize = (aiCount) => {
     const parked = W.parked || [];
-    W.cars = new CarInstancer(scene, parked.length + aiCount, T.beam);
+    W.cars = new Fleet(scene, ['sedan', 'hatch', 'suv'], aiCount + 4, T.beam);
+    W.parkedFleet = new Fleet(scene, ['sedan', 'hatch', 'suv'], 160, T.beam);
     for (const p of parked) {
-      const i = W.cars.add();
-      W.cars.setColor(i, CAR_COLORS[(rand() * CAR_COLORS.length) | 0]);
-      W.cars.set(i, p.x + (rand() - 0.5) * 0.2, W.groundHeight(p.x, p.z) > 0 ? SLAB : 0, p.z, p.h + (rand() - 0.5) * 0.04, 0, 0, null);
+      p.k = rand() < 0.45 ? 0 : rand() < 0.6 ? 1 : 2;
+      p.col = CAR_COLORS[(rand() * CAR_COLORS.length) | 0];
+      p.dx = (rand() - 0.5) * 0.2; p.dh = (rand() - 0.5) * 0.04;
       const hl = CFG.CAR_HL, hw = CFG.CAR_HW;
       const alongZ = Math.abs(Math.cos(p.h)) > 0.5;
       addBox(p.x - (alongZ ? hw : hl), p.x + (alongZ ? hw : hl), p.z - (alongZ ? hl : hw), p.z + (alongZ ? hl : hw), 'car');
     }
-    W.cars.flush();
+    W.cullParked(0, 0, true);
+  };
+  // draw only the parked cars near the camera (they are static, so refresh twice a second)
+  let lastCull = { x: 1e9, z: 1e9 };
+  W.cullParked = (cx, cz, force) => {
+    if (!force && Math.hypot(cx - lastCull.x, cz - lastCull.z) < 12) return;
+    lastCull = { x: cx, z: cz };
+    const F = W.parkedFleet; F.reset();
+    const R2 = 135 * 135;
+    const counts = [0, 0, 0];
+    for (const p of W.parked) {
+      if ((p.x - cx) ** 2 + (p.z - cz) ** 2 > R2 || counts[p.k] >= 160) continue;
+      counts[p.k]++;
+      const h = F.add(p.k);
+      F.setColor(h, p.col);
+      F.set(h, p.x + p.dx, W.groundHeight(p.x, p.z) > 0 ? SLAB : 0, p.z, p.h + p.dh, 0, 0, null);
+    }
+    F.flush();
   };
 
   // ---------- spatial queries ----------
@@ -423,10 +464,12 @@ export function buildWorld(scene, T, opts = {}) {
 
   W.setNight = (on) => {
     W.night = on;
-    for (const m of facadeMats) m.emissiveIntensity = on ? 1.0 : 0;
-    headMat.emissiveIntensity = on ? 2.5 : 0;
+    for (const m of facadeMats) m.emissiveIntensity = on ? 0.75 : 0;
+    shopMat.emissiveIntensity = on ? 0.38 : 0;
+    headMat.emissiveIntensity = on ? 8 : 0;
     glows.visible = on;
     if (W.cars) W.cars.setNight(on);
+    if (W.parkedFleet) W.parkedFleet.setNight(false);
   };
   return W;
 }

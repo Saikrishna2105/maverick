@@ -88,3 +88,36 @@ export function resolveStatic(car, c, restitution = 0.25) {
   car.setWorldVel(nvx, nvz);
   return -vn;
 }
+
+/** Contact between two dynamic cars (both get pushed). Returns closing speed. */
+export function resolveDynamic(A, B, c, restitution = 0.2) {
+  const tm = A.m + B.m;
+  A.x += c.nx * c.depth * (B.m / tm); A.z += c.nz * c.depth * (B.m / tm);
+  B.x -= c.nx * c.depth * (A.m / tm); B.z -= c.nz * c.depth * (A.m / tm);
+  const [ax, az] = A.worldVel(), [bx, bz] = B.worldVel();
+  const rax = c.px - A.x, raz = c.pz - A.z, rbx = c.px - B.x, rbz = c.pz - B.z;
+  const pax = ax + A.r * raz, paz = az - A.r * rax;
+  const pbx = bx + B.r * rbz, pbz = bz - B.r * rbx;
+  const vn = (pax - pbx) * c.nx + (paz - pbz) * c.nz;
+  if (vn >= 0) return 0;
+  const rnA = raz * c.nx - rax * c.nz, rnB = rbz * c.nx - rbx * c.nz;
+  const j = (-(1 + restitution) * vn) / (1 / A.m + 1 / B.m + (rnA * rnA) / A.I + (rnB * rnB) / B.I);
+  A.setWorldVel(ax + (j * c.nx) / A.m, az + (j * c.nz) / A.m); A.r += (j * rnA) / A.I;
+  B.setWorldVel(bx - (j * c.nx) / B.m, bz - (j * c.nz) / B.m); B.r -= (j * rnB) / B.I;
+  A.r *= 0.9; B.r *= 0.9;
+  return -vn;
+}
+
+const _tmp = [];
+/** Collides a car against the static city. onImpact(kind, speed, x, z) */
+export function collideWorld(car, W, hl, hw, onImpact) {
+  let A = makeOBB(car.x, car.z, car.h, hl, hw);
+  for (const o of W.query(car.x, car.z, 4, _tmp)) {
+    const c = o.type === 'box' ? obbOverlap(A, aabbToOBB(o)) : obbCircle(A, o.x, o.z, o.r);
+    if (c) {
+      const imp = resolveStatic(car, c);
+      if (onImpact) onImpact(o.kind, imp, c.px, c.pz);
+      A = makeOBB(car.x, car.z, car.h, hl, hw);
+    }
+  }
+}

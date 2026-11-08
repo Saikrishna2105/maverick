@@ -75,7 +75,7 @@ export class Traffic {
       if (this.cars.some((c) => Math.hypot(c.x - p[0], c.z - p[1]) < 12)) continue;
       car.x = p[0]; car.z = p[1]; car.h = headingOfDir(d);
       car.v = car.cruise * 0.6;
-      car.idx = this.W.cars.add();
+      car.idx = this.W.cars.add(this.rand() < 0.5 ? 0 : this.rand() < 0.6 ? 1 : 2);
       this.W.cars.setColor(car.idx, CAR_COLORS[(this.rand() * CAR_COLORS.length) | 0]);
       this.cars.push(car);
       return car;

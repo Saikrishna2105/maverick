@@ -122,3 +122,66 @@ body.touch #parkMeter { top: 190px; }
   #leftBtns { bottom: 184px; }
   h1 { font-size: 30px; }
 }
+
+/* ---------- menu tabs, events, garage ---------- */
+.tabs { display: flex; gap: 8px; margin-bottom: 14px; }
+.tabs button { background: rgba(255,255,255,0.07); }
+.tabs button.on { background: #ff7a1a; }
+#carBar { display: flex; justify-content: space-between; align-items: center; background: linear-gradient(90deg, rgba(255,122,26,0.18), rgba(255,255,255,0.03)); border-radius: 12px; padding: 10px 14px; margin-bottom: 12px; }
+#carBar small { display: block; opacity: 0.6; font-size: 11px; letter-spacing: 2px; }
+#carBar b { font-size: 20px; }
+#eventGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; }
+.ecard { text-align: left; font-weight: 400; padding: 12px; border-radius: 12px; background: linear-gradient(160deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02)); border: 1px solid rgba(255,255,255,0.08); }
+.ecard:hover { border-color: #ff7a1a; }
+.ecard .k { font-size: 11px; letter-spacing: 2px; color: #ffb36b; }
+.ecard b { display: block; font-size: 17px; margin: 3px 0; }
+.ecard .d { font-size: 12px; opacity: 0.7; }
+.ecard .w { margin-top: 6px; font-size: 12px; color: #3fd07a; }
+#garageCars { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; margin-bottom: 10px; }
+.gcar { text-align: left; font-weight: 400; background: rgba(255,255,255,0.05); border: 2px solid transparent; border-radius: 12px; padding: 12px; }
+.gcar.sel { border-color: #ff7a1a; }
+.gcar.locked { opacity: 0.45; }
+.gcar b { font-size: 17px; }
+.gcar p { font-size: 12px; opacity: 0.7; margin: 4px 0 8px; min-height: 30px; }
+.stat { display: flex; align-items: center; gap: 6px; font-size: 11px; margin: 3px 0; }
+.stat span { width: 62px; opacity: 0.7; }
+.stat i { flex: 1; height: 6px; border-radius: 3px; background: linear-gradient(90deg, #ff7a1a var(--p), rgba(255,255,255,0.1) var(--p)); }
+#paints { display: flex; gap: 6px; flex-wrap: wrap; }
+#paints button { width: 30px; height: 30px; border-radius: 50%; padding: 0; border: 2px solid rgba(255,255,255,0.2); }
+#paints button.on { border-color: #fff; box-shadow: 0 0 0 2px #ff7a1a; }
+
+/* ---------- race HUD ---------- */
+body.race-mode #dash, body.race-mode #signals, body.race-mode #leftBtns, body.race-mode #gearBtns { display: none !important; }
+#raceBtns { display: none; gap: 6px; }
+body.race-mode #raceBtns { display: flex; }
+#raceBtns button { background: rgba(20,22,26,0.75); padding: 10px 14px; border: 1px solid rgba(255,255,255,0.12); }
+#nosBtn { background: linear-gradient(#1b6fff, #0b3fa8) !important; font-weight: 800; }
+#nosBtn.down { filter: brightness(1.5); }
+#rPos { position: absolute; left: 16px; top: 64px; font-style: italic; font-weight: 900; text-shadow: 0 2px 8px #000; }
+#rPos b { font-size: 64px; } #rPos small { font-size: 26px; opacity: 0.8; }
+#rLap { position: absolute; left: 20px; top: 146px; font-weight: 700; letter-spacing: 2px; text-shadow: 0 2px 6px #000; }
+#rTime { position: absolute; left: 20px; top: 172px; font-variant-numeric: tabular-nums; font-size: 18px; text-shadow: 0 2px 6px #000; }
+#rInfo { position: absolute; left: 20px; top: 200px; font-size: 15px; text-shadow: 0 2px 6px #000; white-space: pre-line; }
+#rCount { position: absolute; left: 50%; top: 30%; transform: translate(-50%, -50%); font-size: 120px; font-weight: 900; font-style: italic; color: #fff; text-shadow: 0 0 30px #ff7a1a, 0 4px 10px #000; }
+#rMsg { position: absolute; left: 50%; top: 22%; transform: translateX(-50%); font-size: 34px; font-weight: 900; font-style: italic; color: #ffd36b; text-shadow: 0 3px 10px #000; white-space: nowrap; }
+#rMsg.show { animation: msgpop 1.6s forwards; }
+@keyframes msgpop { 0% { opacity: 0; transform: translateX(-50%) scale(1.6); } 12% { opacity: 1; transform: translateX(-50%) scale(1); } 75% { opacity: 1; } 100% { opacity: 0; } }
+#rFlash { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; transition: opacity 0.4s; }
+#gauge { position: absolute; right: 14px; bottom: 12px; width: 220px; height: 220px; }
+#tach { width: 220px; height: 220px; }
+#nosBar { position: absolute; left: 30px; right: 30px; bottom: -2px; height: 8px; border-radius: 4px; background: rgba(255,255,255,0.12); overflow: hidden; }
+#nosBar i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, #00b4ff, #4d6bff); box-shadow: 0 0 10px #00b4ff; }
+#heat { position: absolute; left: 50%; top: 58px; transform: translateX(-50%); background: rgba(10,12,16,0.7); border-radius: 10px; padding: 6px 14px; text-align: center; min-width: 220px; }
+#heatLbl { font-size: 11px; letter-spacing: 3px; color: #ff5a4a; font-weight: 800; }
+#heatStars { color: #ff5a4a; letter-spacing: 3px; }
+#pStatus { font-size: 13px; font-weight: 700; }
+body.race-mode #minimap { top: 10px; right: 10px; }
+body.touch.race-mode #gauge { right: auto; left: 50%; transform: translateX(-50%) scale(0.44); transform-origin: bottom center; bottom: 0; }
+body.touch.race-mode #rPos { top: 50px; left: 14px; } body.touch.race-mode #rPos b { font-size: 40px; } body.touch.race-mode #rPos small { font-size: 18px; }
+body.touch.race-mode #rLap { top: 98px; font-size: 12px; } body.touch.race-mode #rTime { top: 116px; font-size: 13px; } body.touch.race-mode #rInfo { top: 136px; font-size: 12px; left: 110px; }
+body.touch.race-mode #minimap { width: 112px !important; height: 112px !important; }
+body.touch.race-mode #rCount { font-size: 80px; }
+body.touch.race-mode #rMsg { font-size: 22px; top: 18%; }
+body.touch.race-mode #heat { top: 50px; transform: translateX(-50%) scale(0.8); }
+body.race-mode #minimap { left: auto !important; right: 10px !important; top: 10px !important; width: 170px; height: 170px; }
+body.race-mode #stats { display: none; }

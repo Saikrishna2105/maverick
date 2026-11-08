@@ -28,6 +28,17 @@
       <div class="bar"><label>DMG</label><i id="dmgBar"></i></div>
       <div id="icons"><span id="icoLights" title="Headlights">💡</span><span id="icoHand" title="Handbrake">(P)</span></div>
     </div>
+    <div id="raceHud" class="hidden">
+      <div id="rPos"><b>1</b><small>/4</small></div>
+      <div id="rLap"></div>
+      <div id="rTime">0:00.00</div>
+      <div id="rInfo"></div>
+      <div id="rCount"></div>
+      <div id="rMsg"></div>
+      <div id="rFlash"></div>
+      <div id="heat" class="hidden"><span id="heatLbl">HEAT</span><div id="heatStars"></div><div id="pStatus"></div><div class="pm"><i id="pMeter"></i></div></div>
+      <div id="gauge"><canvas id="tach" width="440" height="440"></canvas><div id="nosBar"><i></i></div></div>
+    </div>
     <div id="parkMeter" class="hidden"><div id="parkText">Line up in the bay</div><div class="pm"><i id="parkFill"></i></div></div>
     <button id="pauseBtn" data-action="pause" aria-label="Pause">❚❚</button>
     <div id="touch" class="hidden">
@@ -37,6 +48,7 @@
       </div>
       <div id="rightBtns">
         <div id="gearBtns"><button data-action="P">P</button><button data-action="R">R</button><button data-action="N">N</button><button data-action="D">D</button></div>
+        <div id="raceBtns"><button data-action="reset">↺</button><button id="nosBtn">NOS</button></div>
         <div id="smallBtns"><button data-action="lights">💡</button><button data-action="camera">🎥</button><button id="horn">📯</button><button id="hand">HB</button></div>
         <div id="pedals"><div id="brake" class="pedal">BRAKE</div><div id="gas" class="pedal">GAS</div></div>
       </div>
@@ -46,12 +58,28 @@
   <div id="menu" class="screen">
     <div class="panel wide">
       <h1>MAVERICK <span>DRIVE</span></h1>
-      <p class="sub">Realistic city driving simulator</p>
-      <div id="missionGrid"></div>
+      <p class="sub">Street racing &amp; city driving simulator</p>
+      <div class="tabs"><button data-tab="race" class="on">🏁 Street Racing</button><button data-tab="school">🚗 Driving School</button></div>
+      <div id="tabRace">
+        <div id="carBar"><div><small>YOUR CAR</small><b id="carName">—</b></div><button id="btnGarage">🔧 Garage</button></div>
+        <div id="eventGrid"></div>
+      </div>
+      <div id="tabSchool" class="hidden"><div id="missionGrid"></div></div>
       <div class="row">
         <button id="btnSettings" class="ghost">⚙ Settings</button>
         <button id="btnHelp" class="ghost">⌨ Controls</button>
       </div>
+    </div>
+  </div>
+
+  <div id="garage" class="screen hidden">
+    <div class="panel wide">
+      <h2>Garage</h2>
+      <div id="garageCars"></div>
+      <div class="opt"><span>Paint</span><div id="paints"></div></div>
+      <div class="opt"><span>Gearbox</span><div class="seg" data-key="manual"><button data-v="false">Automatic</button><button data-v="true">Manual (Q/E)</button></div></div>
+      <div class="opt"><span>Driving assists (traction &amp; stability)</span><div class="seg" data-key="assists"><button data-v="true">On</button><button data-v="false">Off</button></div></div>
+      <div class="row"><button id="btnGarageBack">Done</button></div>
     </div>
   </div>
 
@@ -115,6 +143,10 @@
         <tr><td>H</td><td>Horn</td></tr>
         <tr><td>C</td><td>Change camera</td></tr>
         <tr><td>Esc / P</td><td>Pause</td></tr>
+        <tr><td colspan="2"><b>Street racing</b></td></tr>
+        <tr><td>Shift / N</td><td>Nitro</td></tr>
+        <tr><td>Q / E</td><td>Shift down / up (manual gearbox)</td></tr>
+        <tr><td>R</td><td>Reset car onto the road</td></tr>
       </table>
       <p class="meta">With <b>Easy gears</b> on, holding brake at a standstill selects reverse (then ↓ drives backwards and ↑ brakes); accelerating from a standstill selects drive. Phones and tablets get a steering wheel, pedals and gear buttons. Gamepads work too (RT/LT pedals, left stick steers, A handbrake).</p>
       <div class="row"><button id="btnHelpBack">Got it</button></div>
