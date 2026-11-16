@@ -86,6 +86,11 @@ Neither service needs an account or a key.
   itself. When you turn the extension off, the track is set back to
   `showing`. Tracks the player already keeps `hidden` are only used if no
   caption is found in the page.
+- Rolling captions (YouTube auto-generated captions grow a word at a time): the
+  previous translation stays on screen until the next one is ready, so the
+  French line does not blink. The text is given about 0.25 s to settle before
+  it is translated, only one translation request runs at a time, and a caption
+  that is empty for less than 0.35 s is not treated as gone.
 - The overlay goes right below the caption. If there is no room inside the
   video, it goes right above the caption. If the caption's position is
   unknown, it goes at the bottom of the video. In fullscreen it is placed

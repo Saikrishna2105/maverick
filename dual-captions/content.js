@@ -38,6 +38,9 @@
   const MAX_CAPTION_CHARS = 300;          // longer text is not a caption
   const DOM_DEBOUNCE_MS = 90;             // merge "clear + refill" DOM updates
   const TICK_MS = 200;                    // reposition / visibility check
+  const SETTLE_MS = 250;                  // rolling captions: wait for the text to stop changing...
+  const MAX_WAIT_MS = 800;                // ...but never longer than this before translating
+  const HIDE_GRACE_MS = 350;              // a caption that is gone for less than this is not "gone"
   const VIDEO_SCAN_MS = 1500;             // look for new <video>/<track>
 
   function log(...args) {
@@ -141,6 +144,8 @@
   const CACHE_MAX = 500;
   const cache = new Map();     // "en|fr|text" -> translation (LRU order)
   const inflight = new Map();  // same key -> Promise, to avoid duplicate requests
+
+  const cacheKey = (text) => `${settings.sourceLang}|${settings.targetLang}|${text}`;
 
   function cacheGet(key) {
     if (!cache.has(key)) return undefined;
@@ -300,7 +305,7 @@
     const tgt = settings.targetLang;
     if (src === tgt) return Promise.resolve(text);
 
-    const key = `${src}|${tgt}|${text}`;
+    const key = cacheKey(text);
     const hit = cacheGet(key);
     if (hit !== undefined) return Promise.resolve(hit);
     if (inflight.has(key)) return inflight.get(key);
@@ -351,7 +356,11 @@
   // What is currently displayed.
   // source: 'dom' | 'track' | null
   let current = { source: null, text: '', translated: null, anchor: null, video: null, showOriginal: false };
-  let renderSeq = 0; // bumps on every change; stale translations are dropped
+  let renderSeq = 0;  // bumps on every caption change
+  let shownSeq = 0;   // request number of the translation on screen; older answers are ignored
+  let settleTimer = null;
+  let firstPendingAt = 0;  // when the first not-yet-translated change arrived
+  let inactiveSince = 0;   // when the DOM caption was last seen missing
 
   function ensureOverlay() {
     if (!overlay) {
@@ -385,11 +394,13 @@
     return document.body || document.documentElement;
   }
 
+  const setText = (el, t) => { if (el.textContent !== t) el.textContent = t; };
+
   function render() {
     const o = ensureOverlay();
-    origLine.textContent = current.showOriginal ? current.text : '';
+    setText(origLine, current.showOriginal ? current.text : '');
     origLine.hidden = !current.showOriginal;
-    transLine.textContent = current.translated || '';
+    setText(transLine, current.translated || '');
     transLine.hidden = !current.translated;
     o.hidden = !(current.showOriginal || current.translated);
     if (o.hidden) {
@@ -402,6 +413,10 @@
 
   function hideOverlay() {
     renderSeq++; // cancel pending translations
+    nextJob = null;
+    clearTimeout(settleTimer);
+    firstPendingAt = 0;
+    inactiveSince = 0;
     current = { source: null, text: '', translated: null, anchor: null, video: null, showOriginal: false };
     if (overlay) overlay.hidden = true;
     stopTick();
@@ -464,12 +479,19 @@
   function tick() {
     if (current.source === 'dom') {
       if (!domCaptionActive()) {
-        log('Caption disappeared -> hiding translation.');
-        hideOverlay();
-        return;
+        // Players often clear and refill the caption within a split second.
+        // Only treat it as gone if it stays gone.
+        if (!inactiveSince) inactiveSince = Date.now();
+        if (Date.now() - inactiveSince >= HIDE_GRACE_MS) {
+          log('Caption disappeared -> hiding translation.');
+          hideOverlay();
+          return;
+        }
+      } else {
+        inactiveSince = 0;
+        // Catches changes the observer could not see (e.g. text inside shadow DOM).
+        if (readText(captionEl) !== current.text) scheduleDomUpdate();
       }
-      // Catches changes the observer could not see (e.g. text inside shadow DOM).
-      if (readText(captionEl) !== current.text) scheduleDomUpdate();
     } else if (current.source === 'track' && current.video && !current.video.isConnected) {
       hideOverlay();
       return;
@@ -477,8 +499,22 @@
     positionOverlay();
   }
 
-  /** Translate `text` and display it. opts: {source, anchor, video, showOriginal} */
-  async function showTranslation(text, opts) {
+  // Share of words in `a` that also appear in `b` (used to recognise "the same caption, a bit later").
+  function similar(a, b) {
+    const A = a.toLowerCase().split(/\s+/).filter(Boolean);
+    const B = new Set(b.toLowerCase().split(/\s+/).filter(Boolean));
+    return A.length > 0 && A.filter((w) => B.has(w)).length / A.length >= 0.5;
+  }
+
+  /**
+   * Show a caption and its translation. opts: {source, anchor, video, showOriginal}
+   *
+   * Rolling captions (YouTube auto-captions) change several times a second.
+   * To avoid flicker the previous translation stays on screen until the new one
+   * is ready, and for DOM captions we wait a moment for the text to settle
+   * before asking for a translation.
+   */
+  function showTranslation(text, opts) {
     // Same line already shown (or being translated): just make sure it's visible.
     if (current.source === opts.source && current.text === text) {
       current.anchor = opts.anchor;
@@ -488,16 +524,54 @@
     }
 
     const seq = ++renderSeq;
-    current = { ...opts, text, translated: null };
-    // Hide the previous translation right away so it never sits under the
-    // wrong line; in "showOriginal" mode the original is shown immediately.
+    const rolling = opts.source === 'dom';
+    // Keep the old French line (do not blink) only for rolling DOM captions;
+    // a new native cue must never sit under the previous cue's translation.
+    const keepOld = rolling && current.source === 'dom' && !!current.translated;
+    current = { ...opts, text, translated: keepOld ? current.translated : null };
     render();
 
-    const translated = await translate(text);
-    if (seq !== renderSeq) return; // a newer caption arrived meanwhile
-    if (translated == null) return;
-    current.translated = translated;
-    render();
+    clearTimeout(settleTimer);
+    const hit = cacheGet(cacheKey(text));
+    if (hit !== undefined) { // already translated: show it immediately
+      firstPendingAt = 0;
+      shownSeq = seq;
+      current.translated = hit;
+      render();
+      return;
+    }
+
+    let wait = 0;
+    if (rolling) {
+      if (!firstPendingAt) firstPendingAt = Date.now();
+      wait = Math.max(0, Math.min(SETTLE_MS, MAX_WAIT_MS - (Date.now() - firstPendingAt)));
+    }
+    settleTimer = setTimeout(() => translateNow(text, seq), wait);
+  }
+
+  // Only one translation request at a time. If captions change faster than the
+  // translator answers, requests would pile up and the French would fall further
+  // and further behind. Instead we remember only the newest text and send it next.
+  let translating = false;
+  let nextJob = null;
+
+  async function translateNow(text, seq) {
+    firstPendingAt = 0;
+    if (translating) { nextJob = { text, seq }; return; }
+    translating = true;
+    try {
+      const out = await translate(text);
+      if (out == null || seq <= shownSeq) return; // failed, or a newer translation is already on screen
+      // The caption moved on while we waited. Still use the answer if it is the same
+      // rolling caption (slightly behind is better than blank); drop it if it is a different one.
+      if (seq !== renderSeq && !(current.source === 'dom' && similar(text, current.text))) return;
+      shownSeq = seq;
+      current.translated = out;
+      render();
+    } finally {
+      translating = false;
+      if (nextJob) { const job = nextJob; nextJob = null; translateNow(job.text, job.seq); }
+    }
   }
 
   /* ------------------------------------------------------------------ */
@@ -623,10 +697,8 @@
   /** Read the detected caption element and show its translation. */
   function updateFromDom() {
     if (!settings.enabled) return;
-    if (!domCaptionActive()) {
-      if (current.source === 'dom') hideOverlay();
-      return;
-    }
+    if (!domCaptionActive()) return; // tick() hides the overlay if it stays empty
+    inactiveSince = 0;
     const text = readText(captionEl);
     if (text.length > MAX_CAPTION_CHARS || !looksLikeSource(text)) {
       if (current.source === 'dom') hideOverlay();
